@@ -1,5 +1,13 @@
 'use strict'
 
+process.on('uncaughtException', (err) => {
+  console.log('uncaughtException:', err)
+})
+
+process.on('unhandledRejection', (reason, p) => {
+  console.log('unhandledRejection', reason, p)
+})
+
 const path = require('path')
 const fs = require('fs')
 const request = require('request')
@@ -25,7 +33,7 @@ console.log('preliminary calculations complete')
  * @param {number} limit
  * @returns {Array}
  */
-function search (query, limit=50) {
+function search (query, limit = 50) {
   const qWords = query.toLowerCase().replace(/[^\sa-z]/g, '').split(/\s+/).filter((x) => !!x)
   const scores = []
   data.forEach((q, index) => {
@@ -38,7 +46,7 @@ function search (query, limit=50) {
       for (let nt of q.normText) {
         const ntIndex = nt.indexOf(w)
         if (ntIndex > -1) {
-          score +=  (1 - ntIndex / nt.length)
+          score += (1 - ntIndex / nt.length)
         }
       }
     }
@@ -48,6 +56,61 @@ function search (query, limit=50) {
   })
   return scores.sort((a, b) => b[1] - a[1]).slice(0, limit).map((x) => data[x[0]])
 }
+
+/*  CACHING FILES  */
+const dumpsterChats = ['-145765036', '-148599029', '-125221386']  // that's my chats!
+const defaultTimeout = 1100  // ms
+let saveTm = null
+
+function save () {
+  fs.writeFileSync(path.resolve(__dirname, './data/file_ids.json'), JSON.stringify(data, null, 2), 'utf8')
+  saveTm = null
+}
+
+/**
+ * @param {string|number} chat
+ * @param {Object} voice
+ * @returns {Promise}
+ */
+function sendVoice (chat, voice) {
+  console.log('sending voice:', chat, voice)
+  return bot.sendVoice(chat, fileIds[voice.src] || request({ url: voice.src })).then((resp) => {
+    fileIds[voice.src] = resp.voice.file_id || fileIds[voice.src]
+    saveTm = saveTm || setTimeout(save, 10000)
+  })
+}
+
+function uploadMissingAudio () {
+  let timeout = defaultTimeout
+  let i = 0
+
+  function tick () {
+    while (data[i] && fileIds[data[i].src]) {
+      i += 1
+    }
+    if (i >= data.length) {
+      console.log('uploading files: complete')
+      return
+    }
+    sendVoice(dumpsterChats[i % dumpsterChats.length], data[i]).then(() => {
+      i += 1
+      timeout = defaultTimeout
+      setTimeout(tick, timeout)
+    }, (err) => {
+      console.log(err)
+      timeout *= 2
+      setTimeout(tick, timeout)
+    }).catch((err) => {
+      console.log(err)
+      timeout *= 2
+      setTimeout(tick, timeout)
+    })
+  }
+
+  tick()
+}
+
+uploadMissingAudio()
 
 /*  INLINE QUERY  */
 bot.on('inline_query', (inlineQuery) => {
@@ -79,7 +142,7 @@ bot.onText(/^\s*\/random(\s(.*))?/, (msg, match) => {
   console.log('toSend', toSend.length)
   toSend = toSend[(Math.random() * toSend.length) | 0]
   if (toSend) {
-    sendAudio(msg.chat.id, toSend)
+    sendVoice(msg.chat.id, toSend)
   }
 })
 
@@ -88,56 +151,4 @@ bot.onText(/^\s*\/log/, (msg) => {
   console.log(msg)
 })
 
-/*  CACHING FILES  */
-const dumpsterChats = ['-145765036', '-148599029', '-125221386']  // that's my chats!
-const defaultTimeout = 1100  // ms
-let saveTm = null
-
-function save () {
-  fs.writeFileSync(path.resolve(__dirname + './data/file_ids.json'), JSON.stringify(data, null, 2), 'utf8')
-  saveTm = null
-}
-
-/**
- * @param {string|number} chat
- * @param {Object} voice
- * @returns {Promise}
- */
-function sendVoice(chat, voice) {
-  console.log('sending voice:', chat, voice)
-  return bot.sendVoice(chat, fileIds[voice.src] || request({ url: voice.src })).then((resp) => {
-    fileIds[voice.src] = resp.voice.file_id || fileIds[voice.src]
-    saveTm = saveTm || setTimeout(save, 10000)
-  })
-}
-
-function uploadMissingAudio() {
-  let timeout = defaultTimeout
-  let i = 0
-
-  function tick () {
-    while (data[i] && fileIds[data[i].src]) {
-      i += 1
-    }
-    if (i >= data.length) {
-      return
-    }
-    sendVoice(dumpsterChats[i % dumpsterChats.length], data[i]).then(() => {
-      i += 1
-      timeout = defaultTimeout
-      setTimeout(tick, timeout)
-    }, (err) => {
-      console.log(err)
-      timeout *= 2
-      setTimeout(tick, timeout)
-    }).catch((err) => {
-      console.log(err)
-      timeout *= 2
-      setTimeout(tick, timeout)
-    })
-  }
-
-  tick()
-}
-
-uploadMissingAudio()
+console.log('audiolol_bot started')
