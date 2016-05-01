@@ -1,11 +1,16 @@
 {
   "name": "audiolol_bot",
-  "version": "1.0.0",
-  "description": "@audiolol_bot Telegram bot",
+  "version": "1.0.1",
+  "description": "@audiolol_bot Telegram bot: Audio quotes from League of Legends",
   "main": "index.js",
   "author": "Anton Viller",
   "license": "ISC",
   "private": true,
+  "homepage": "http://telegram.me/audiolol_bot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/viller239/audiolol-telegram-bot"
+  },
   "dependencies": {
     "cheerio": "^0.20.0",
     "node-telegram-bot-api": "^0.21.1",
