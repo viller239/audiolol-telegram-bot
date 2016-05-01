@@ -33,7 +33,8 @@ console.log('preliminary calculations complete')
  * @param {number} limit
  * @returns {Array}
  */
-function search (query, limit = 50) {
+function search (query, limit) {
+  limit = limit || 50
   const qWords = query.toLowerCase().replace(/[^\sa-z]/g, '').split(/\s+/).filter((x) => !!x)
   const scores = []
   data.forEach((q, index) => {
